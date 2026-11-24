@@ -21,8 +21,11 @@ calculate_phylogenetic_diversity <- function(tree, species_in_tree){
 
 # ---- Read data ----
 app_configs = jsonlite::fromJSON('../../app_configs.json')
+# Optional first argument: directory holding the accepted names csv and receiving outputs
+args <- commandArgs(trailingOnly = TRUE)
+data_dir <- if (length(args) >= 1) args[1] else app_configs$cache_dir
 tree <- read.tree("my_cleaned_deduplicated_tree.tre")
-df   <- read.csv(file.path(app_configs$cache_dir, app_configs$accplantsfilename), stringsAsFactors = FALSE)
+df   <- read.csv(file.path(data_dir, app_configs$accplantsfilename), stringsAsFactors = FALSE)
 
 selected_tips <- intersect(tree$tip.label ,df$tree_name)
 
@@ -32,4 +35,4 @@ proportion = user_div/total_div
 
 df = data.frame(c(user_div, total_div, proportion, length(selected_tips), length(tree$tip.label)),row.names =c('user_div', 'total_div', 'proportion', 'user_tips', 'total_tips'))
 names(df) = 'diversity_measures'
-write.csv(df,file.path(app_configs$cache_dir, app_configs$phydivfilename))
+write.csv(df,file.path(data_dir, app_configs$phydivfilename))

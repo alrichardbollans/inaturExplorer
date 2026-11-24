@@ -2,6 +2,9 @@
 # of tips named in df.csv. No tip labels.
 # Requires: ape
 app_configs = jsonlite::fromJSON('../../app_configs.json')
+# Optional first argument: directory holding the accepted names csv and receiving outputs
+args <- commandArgs(trailingOnly = TRUE)
+data_dir <- if (length(args) >= 1) args[1] else app_configs$cache_dir
 library(ape)
 library(ggtree)
 library(ggplot2) # for the scale_color_manual function
@@ -17,7 +20,7 @@ lwd_bg   <- 0.1
 
 # ---- Read data ----
 tree <- read.tree("my_cleaned_deduplicated_tree.tre")
-df   <- read.csv(file.path(app_configs$cache_dir, app_configs$accplantsfilename), stringsAsFactors = FALSE)
+df   <- read.csv(file.path(data_dir, app_configs$accplantsfilename), stringsAsFactors = FALSE)
 
 ntip   <- length(tree$tip.label)
 selected_tips <- intersect(tree$tip.label ,df$tree_name)
@@ -103,5 +106,4 @@ circ1 = get_plots_for_tips(pruned_tree, selected_tips,col_hl)
 # plot(circ1)
 # ---- Plot (PNG, since a vector file with 200k tips gets huge/slow) ----
 # edge.color / edge.width are indexed by row of tree$edge, which is exactly what mark is.
-app_configs = jsonlite::fromJSON('../../app_configs.json')
-ggsave(file.path(app_configs$cache_dir, app_configs$phyplotfilename), width = 8, height = 8, dpi = 600)
+ggsave(file.path(data_dir, app_configs$phyplotfilename), width = 8, height = 8, dpi = 600)

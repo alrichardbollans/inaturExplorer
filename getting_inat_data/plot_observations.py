@@ -6,6 +6,16 @@ import pandas as pd
 
 from getting_inat_data import app_configs
 
+# Opens the clicked observation on iNaturalist (used when the figure is written to html).
+MAP_CLICK_JS = """
+var gd = document.getElementsByClassName('plotly-graph-div')[0];
+gd.on('plotly_click', function(e) {
+    var url = e.points[0].customdata[0];
+    if (url) window.open(url, '_blank');
+});
+"""
+MAP_CONFIG = {'modeBarButtonsToRemove': ['lasso2d', 'select2d']}
+
 KINGDOM_COLOURS = {'Animalia': '#2a78d6', 'Fungi': '#eb6834', 'Plantae': '#1baf7a'}
 
 
@@ -47,13 +57,6 @@ def plot_observation_map(user_df: pd.DataFrame, out_html: str = None):
 
     # df['Link'] = df['uri'].apply(lambda x: f'<a href="{x}" target="_blank">Link</a>')
 
-    click_js = """
-    var gd = document.getElementsByClassName('plotly-graph-div')[0];
-    gd.on('plotly_click', function(e) {
-        var url = e.points[0].customdata[0];
-        if (url) window.open(url, '_blank');
-    });
-    """
 
     fig.update_layout(
         title={'text': f'Observations ({len(df)}) — {df["username"].iloc[0]}',
@@ -65,18 +68,15 @@ def plot_observation_map(user_df: pd.DataFrame, out_html: str = None):
         font={'family': 'Inter, Helvetica, Arial, sans-serif'}
     )
 
-    config = {
-        'modeBarButtonsToRemove': ['lasso2d', 'select2d']
-    }
     if out_html:
-        fig.write_html(out_html, include_plotlyjs='cdn', config=config, post_script=click_js)
+        fig.write_html(out_html, include_plotlyjs='cdn', config=MAP_CONFIG, post_script=MAP_CLICK_JS)
     return fig
 
 
 def main():
 
     user_df = pd.read_csv(os.path.join(app_configs["cache_dir"], app_configs["userfilename"]))
-    plot_observation_map(user_df, 'test.html')
+    plot_observation_map(user_df, os.path.join(app_configs["cache_dir"],'obs_map.html'))
 
 
 if __name__ == '__main__':

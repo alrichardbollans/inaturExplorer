@@ -13,7 +13,7 @@ count = 0
 last_reset_time = datetime.datetime.now()
 rate_limit = 60  # Max number of requests per minute
 
-app_configs = json.load(open("../app_configs.json"))
+app_configs = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "app_configs.json")))
 cache_dir = app_configs["cache_dir"]
 
 
@@ -47,16 +47,6 @@ def find_taxon(name: str):
     return response["results"][0]
 
 
-def count_observations_across_inat(taxon_id, **filters):
-    raise NotImplementedError
-    """Return the number of observations for a taxon_id.
-    Extra filters (e.g. quality_grade='research', place_id=6857) pass straight through."""
-    generic_throttling()
-
-    response = get_observations(taxon_id=taxon_id, per_page=0, **filters)
-    return response["total_results"]
-
-
 def get_user_data(username: str):
     generic_throttling()
 
@@ -70,7 +60,9 @@ def get_user_data(username: str):
                 'latitude': o.location[0] if o.location else None,
                 'longitude': o.location[1] if o.location else None,
                 'captive': o.captive, 'quality_grade': o.quality_grade,
-                'date': o.observed_on.isoformat() if o.observed_on else None, 'uri': o.uri, 'username': o.username}
+                'date': o.observed_on.isoformat() if o.observed_on else None, 'uri': o.uri,
+                'first_photo': [o.photos[0].medium_url, o.photos[0].attribution, o.photos[0].license_code] if o.photos else None,
+                'username': o.username}
                for o in user_obs if o.taxon]
 
     df = pd.DataFrame(df_list)
@@ -78,12 +70,41 @@ def get_user_data(username: str):
     return df
 
 
+def get_rarest_observation(user_data, include_captive: bool = False, rank='species'):
+    data = user_data[user_data['rank'] == rank]
+    if not include_captive:
+        data = data[~data['captive']]
+    return data.sort_values('total_obs_count', ascending=True).iloc[0]
+
+def get_favourite_taxa(user_data, include_captive: bool = True, rank='species'):
+    species = user_data[user_data["rank"] == rank]
+    if not include_captive:
+        species = species[~species['captive']]
+    if species.empty:
+        return None
+    counts = (
+        species.groupby(["id", "name"]).size().rename("n").reset_index()
+        .sort_values(["n", "name"], ascending=[False, True])  # alphabetical tie-break
+        .set_index(["id", "name"])["n"]
+    )
+    top_id = counts.index[0][0]
+    top_obs = species[species["id"] == top_id]
+    with_photo = top_obs[top_obs["first_photo"].notna()]
+    obs = (with_photo if not with_photo.empty else top_obs).iloc[0]
+    return counts, obs
+
 def main():
     os.makedirs(cache_dir, exist_ok=True)
     print(cache_dir)
     # count_observations('Puma concolor')
     user_df = get_user_data('adamrb2')
     user_df.to_csv(os.path.join(cache_dir, app_configs["userfilename"]))
+
+    rarest_obs = get_rarest_observation(user_df)
+    print(rarest_obs)
+
+    fave_taxon = get_favourite_taxon(user_df)
+    print(fave_taxon)
     # print(user_df)
     # acc_df = resolve_names(user_df)
     # acc_df.to_csv(os.path.join(cache_dir, app_configs["accplantsfilename"]))
