@@ -5,3 +5,12 @@ shiny
 shinywidgets
 pandas
 Pillow
+requests
+tqdm
+html5lib
+typing
+cirpy
+rdkit
+standardiser
+setuptools
+beautifulsoup4
