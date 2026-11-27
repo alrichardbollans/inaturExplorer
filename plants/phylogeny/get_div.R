@@ -1,4 +1,4 @@
-logr::log_print('running get_div.R')
+print('running get_div.R')
 library(ape)
 source('helpers.R')
 
@@ -48,7 +48,7 @@ write.csv(results,file.path(data_dir, app_configs$maxdivresultsfilename))
 tree = prune_one_per_genus(tree, c(selected_tips, results$tip))
 
 circ1 = get_plots_for_tips(tree, selected_tips, extra_tips = results$tip, extra_highlight_colour="blue")
-gc()
+
 # ---- Plot (PNG, since a vector file with 200k tips gets huge/slow) ----
 # edge.color / edge.width are indexed by row of tree$edge, which is exactly what mark is.
 ggsave(file.path(data_dir, app_configs$maxdivphyplotfilename), width = 2.6, height = 2.6,units = 'in', dpi = 600)
