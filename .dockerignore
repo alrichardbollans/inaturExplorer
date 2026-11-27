@@ -1,0 +1,27 @@
+.git
+.idea
+.agents
+.codex
+.aws
+
+**/__pycache__
+**/*.py[cod]
+**/.venv
+**/venv
+**/.pytest_cache
+**/.mypy_cache
+
+# Local caches and generated analysis outputs
+.cache
+cache
+*_cache
+**/name matching temp outputs
+**/Rplots.pdf
+getting_inat_data/obs_map.html
+getting_inat_data/test.html
+plants/phytochemistry/species_chemodiversity.csv
+**/compound_occurrences.csv
+
+# The app reads these data files at runtime.
+!plants/phylogeny/my_cleaned_deduplicated_tree.tre
+!plants/phytochemistry/all_phytochemdiv.csv
