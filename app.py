@@ -62,12 +62,12 @@ def _parse_photo(value):
             return None
     return value if isinstance(value, (list, tuple)) else None
 
+
 def get_resolved_names(udir: str):
     user_path, acc_path = os.path.join(udir, USER_FILE), os.path.join(udir, ACC_FILE)
     if not os.path.exists(acc_path):
         user_df = pd.read_csv(user_path, index_col=0)
         acc_df = resolve_names(user_df)
-
 
         acc_df.to_csv(acc_path)
     else:
@@ -78,7 +78,11 @@ def get_resolved_names(udir: str):
 def load_or_import_user(username: str, refresh: bool) -> dict:
     """Blocking work: load the user's data from cache, or fetch + resolve and cache it."""
     udir = user_cache_dir(username)
-    user_path = os.path.join(udir, USER_FILE)
+    user_path, acc_path = os.path.join(udir, USER_FILE), os.path.join(udir, ACC_FILE)
+
+    if refresh and os.path.exists(acc_path):
+        os.remove(acc_path)
+
     from_cache = not refresh and os.path.exists(user_path)
 
     if from_cache:
@@ -131,7 +135,7 @@ def load_or_compute_phytochem(udir: str, acc_df: pd.DataFrame) -> dict:
                 phytochem.COMPOUND_ID_COL, "NPclassif_pathway_results_0"]
         compounds = compounds[keep]
         compounds.to_csv(cmpd_path)
-    return {"dir": udir, "measures": measures.iloc[0] if not measures.empty else None, "compounds": compounds}
+    return {"dir": udir, "measures": measures.iloc[0] if not measures.empty else None, "compounds": compounds, "acc_df": acc_df}
 
 
 def compact_number(value: float) -> str:
@@ -185,6 +189,7 @@ def image_data_uri(path: str) -> str:
 
 
 def make_display_copy(plot_path: str, max_px: int = 1600) -> str:
+    raise DeprecationWarning('No longer used.')
     """The R plot is 4800px / several MB; send a smaller copy to the browser."""
     display_path = plot_path.replace(".png", "_display.png")
     if not os.path.exists(display_path) or os.path.getmtime(display_path) < os.path.getmtime(plot_path):
@@ -254,7 +259,6 @@ app_ui = ui.page_fluid(
 # --------------------------------------------------------------------------------------
 
 def server(input, output, session):
-
     # ---- Import -----------------------------------------------------------------------
 
     @ui.bind_task_button(button_id="import_btn")
@@ -420,7 +424,7 @@ def server(input, output, session):
     @ui.bind_task_button(button_id="analyse_btn")
     @reactive.extended_task
     async def div_task(udir: str):
-        get_resolved_names(udir)
+        acc_df = get_resolved_names(udir)
         div_path, plot_path = os.path.join(udir, PHYDIV_FILE), os.path.join(udir, PHYPLOT_FILE)
         jobs = []
         if not os.path.exists(div_path):
@@ -429,7 +433,7 @@ def server(input, output, session):
             jobs.append(run_r_script("plot_tree.R", udir))
         await asyncio.gather(*jobs)  # both scripts run concurrently
         measures = pd.read_csv(div_path, index_col=0)["diversity_measures"]
-        return {"dir": udir, "measures": measures, "plot": make_display_copy(plot_path)}
+        return {"dir": udir, "measures": measures, "plot": plot_path, "acc_df": acc_df}
 
     @reactive.effect
     @reactive.event(input.analyse_btn)
@@ -454,7 +458,7 @@ def server(input, output, session):
             )
 
         m = div_task.result()["measures"]
-        acc_df = get_resolved_names(div_task.result()["dir"])
+        acc_df = div_task.result()["acc_df"]
         return ui.TagList(
             ui.layout_columns(
                 ui.value_box("Faith's phylogenetic diversity", f"{m['user_div']:,.0f}",
@@ -490,7 +494,7 @@ def server(input, output, session):
 
     @render.data_frame
     def species_table():
-        acc_df = get_resolved_names(div_task.result()["dir"])
+        acc_df = div_task.result()["acc_df"]
         table = (
             acc_df.groupby(["accepted_family", "accepted_species"], as_index=False)
             .size()
@@ -499,18 +503,18 @@ def server(input, output, session):
         )
         return render.DataGrid(table, filters=True, height="550px")
 
-
     # ---- Phytochemical diversity ------------------------------------------------------
 
     @ui.bind_task_button(button_id="analyse_chem_btn")
     @reactive.extended_task
-    async def chem_task(udir: str, acc_df: pd.DataFrame):
+    async def chem_task(udir: str):
+        acc_df = get_resolved_names(udir)
         return await asyncio.to_thread(load_or_compute_phytochem, udir, acc_df)
 
     @reactive.effect
     @reactive.event(input.analyse_chem_btn)
     def _start_chem_analysis():
-        chem_task(imported()["dir"], imported()["acc_df"])
+        chem_task(imported()["dir"])
 
     @render.ui
     def phytochem_section():
@@ -531,7 +535,7 @@ def server(input, output, session):
 
         result = chem_task.result()
         m, compounds = result["measures"], result["compounds"]
-        n_species = imported()["acc_df"]["accepted_species"].nunique()
+        n_species = chem_task.result()["acc_df"]["accepted_species"].nunique()
         n_with = compounds["accepted_species"].nunique()
         if m is None:
             return ui.p("None of your observed plant species have recorded compounds.",

@@ -3,5 +3,7 @@
   "userfilename": "user.csv",
   "accplantsfilename": "user_accepted_names.csv",
   "phydivfilename": "phydiv.csv",
-  "phyplotfilename": "phyplot.png"
+  "phyplotfilename": "phyplot.png",
+  "maxdivresultsfilename": "maxdiv_results.csv",
+  "maxdivphyplotfilename": "phyplot_withmaxdiv.png"
 }
