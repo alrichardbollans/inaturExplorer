@@ -1,0 +1,6 @@
+pyinaturalist
+plotly
+numpy
+shiny
+shinywidgets
+pandas

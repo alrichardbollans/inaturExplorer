@@ -286,8 +286,10 @@ app_ui = ui.page_fluid(
         """),
     ),
     ui.div(
-        ui.h1("inaturDex", class_="display-4"),
-        ui.p("Explore your iNaturalist observations.", class_="lead text-muted"),
+        ui.h1("inaturExplorer", class_="display-4"),
+        ui.p(
+            "Explore the biodiversity in your iNaturalist observations. Map your sightings, see where your plants fit on the tree of life, and discover their recorded compounds.",
+            class_="lead text-muted"),
         class_="text-center mt-5 mb-4",
     ),
     ui.div(
@@ -304,7 +306,7 @@ app_ui = ui.page_fluid(
         class_="mx-auto mt-4 mb-5",
         style="max-width: 1000px;",
     ),
-    title="inaturDex",
+    title="inaturExplorer",
 )
 
 

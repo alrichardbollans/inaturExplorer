@@ -1,4 +1,3 @@
-import json
 import os
 
 import numpy as np
@@ -57,7 +56,6 @@ def plot_observation_map(user_df: pd.DataFrame, out_html: str = None):
 
     # df['Link'] = df['uri'].apply(lambda x: f'<a href="{x}" target="_blank">Link</a>')
 
-
     fig.update_layout(
         title={'text': f'Observations ({len(df)}) — {df["username"].iloc[0]}',
                'x': 0.01, 'font': {'size': 18, 'color': '#0b0b0b'}},
@@ -74,8 +72,7 @@ def plot_observation_map(user_df: pd.DataFrame, out_html: str = None):
 
 
 def main():
-
-    user_df = pd.read_csv(os.path.join(app_configs["cache_dir"],'users', 'adamrb2', app_configs["userfilename"]))
+    user_df = pd.read_csv(os.path.join(app_configs["cache_dir"], 'users', 'adamrb2', app_configs["userfilename"]))
     plot_observation_map(user_df, 'obs_map.html')
 
 
