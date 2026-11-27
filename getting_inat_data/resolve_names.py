@@ -28,6 +28,7 @@ def resolve_names(user_df):
 
     acc_df['accepted_species'] = acc_df['accepted_name'].apply(lambda x: get_species_binomial_from_full_name(x))
     acc_df['tree_name'] = acc_df['accepted_species'].apply(lambda x: x.replace(' ', '_'))
+    print('Finished resolving names')
     return acc_df
 
 

@@ -1,3 +1,4 @@
+logr::log_print('running get_div.R')
 library(ape)
 source('helpers.R')
 
@@ -39,13 +40,15 @@ df = data.frame(c(user_div, total_div, proportion, length(selected_tips), length
 names(df) = 'diversity_measures'
 write.csv(df,file.path(data_dir, app_configs$phydivfilename))
 
+print('got diversity measures')
+gc()
 results = rPDtips::max_pd_tips(tree, selected_tips)
 write.csv(results,file.path(data_dir, app_configs$maxdivresultsfilename))
 
-pruned_tree = prune_one_per_genus(tree, c(selected_tips, results$tip))
+tree = prune_one_per_genus(tree, c(selected_tips, results$tip))
 
-circ1 = get_plots_for_tips(pruned_tree, selected_tips, extra_tips = results$tip, extra_highlight_colour="blue")
-plot(circ1)
+circ1 = get_plots_for_tips(tree, selected_tips, extra_tips = results$tip, extra_highlight_colour="blue")
+gc()
 # ---- Plot (PNG, since a vector file with 200k tips gets huge/slow) ----
 # edge.color / edge.width are indexed by row of tree$edge, which is exactly what mark is.
 ggsave(file.path(data_dir, app_configs$maxdivphyplotfilename), width = 2.6, height = 2.6,units = 'in', dpi = 600)
