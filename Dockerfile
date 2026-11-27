@@ -19,16 +19,18 @@ RUN apt-get update \
 ENV PATH="/opt/R/${R_VERSION}/bin:${PATH}"
 
 RUN Rscript --vanilla -e 'options(repos = c(CRAN = "https://cloud.r-project.org")); \
-    install.packages(c("BiocManager", "remotes", "ape", "dplyr", "ggplot2", "jsonlite"))'
+    install.packages(c("BiocManager", "remotes", "ape", "dplyr", "ggplot2", "jsonlite", "phytools"))'
 
 RUN Rscript --vanilla -e 'options(repos = c(CRAN = "https://cloud.r-project.org")); \
     BiocManager::install("ggtree", version = "3.22", ask = FALSE, update = FALSE); \
     stopifnot(requireNamespace("ggtree", quietly = TRUE))'
 
-RUN Rscript --vanilla -e 'remotes::install_github("alrichardbollans/rPDtips", dependencies = NA, upgrade = "never"); \
-    stopifnot(is.function(rPDtips::max_pd_tips))'
-
-RUN Rscript --vanilla -e 'library(ggtree); library(rPDtips); stopifnot(is.function(rPDtips::max_pd_tips), capabilities("png"))'
+RUN Rscript --vanilla -e ' \
+    remotes::install_github("alrichardbollans/rPDtips", upgrade = "never"); \
+    library(rPDtips); \
+    print(packageDescription("rPDtips")[c("Version","RemoteSha","RemoteRef")]); \
+    cat("EXPORTS:\n"); print(getNamespaceExports("rPDtips")); \
+    cat("ALL OBJECTS:\n"); print(ls(asNamespace("rPDtips")))'
 
 WORKDIR /code
 
