@@ -288,7 +288,10 @@ app_ui = ui.page_fluid(
     ui.div(
         ui.h1("inaturExplorer", class_="display-4"),
         ui.p(
-            "Explore the biodiversity in your iNaturalist observations. Map your sightings, see where your plants fit on the tree of life, and discover their recorded compounds.",
+            "Explore the biodiversity in your iNaturalist observations.",
+            class_="lead text-muted"),
+        ui.p(
+            "Map your sightings, see where your plants fit on the tree of life, and discover their recorded compounds.",
             class_="lead text-muted"),
         class_="text-center mt-5 mb-4",
     ),

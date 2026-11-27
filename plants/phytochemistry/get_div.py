@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import pandas as pd
 from phytochempy.chemical_diversity_metrics import calculate_FAD_measures
@@ -7,8 +8,8 @@ from getting_inat_data import app_configs
 
 COMPOUND_ID_COL = 'Standard_SMILES'
 FAD_INDICES = ['FAD', 'MFAD', 'APWD']
-COMPOUND_OCCURRENCES_CSV = '/home/atp/Documents/repos/VascularPlantChemodiversity/outputs/compound_occurrences.csv'
-ALL_DIV_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'all_phytochemdiv.csv')
+COMPOUND_OCCURRENCES_CSV = Path(__file__).resolve().parent / 'compound_occurrences.csv'  # https://github.com/alrichardbollans/VascularPlantChemodiversity/commit/c998ebb1cb1953e479e4ecc7ea793e1d557a9f77
+ALL_DIV_CSV = Path(__file__).resolve().parent / 'all_phytochemdiv.csv'
 
 
 def get_user_compounds(acc_df: pd.DataFrame) -> pd.DataFrame:
