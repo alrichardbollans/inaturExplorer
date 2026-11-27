@@ -75,8 +75,8 @@ def plot_observation_map(user_df: pd.DataFrame, out_html: str = None):
 
 def main():
 
-    user_df = pd.read_csv(os.path.join(app_configs["cache_dir"], app_configs["userfilename"]))
-    plot_observation_map(user_df, os.path.join(app_configs["cache_dir"],'obs_map.html'))
+    user_df = pd.read_csv(os.path.join(app_configs["cache_dir"],'users', 'adamrb2', app_configs["userfilename"]))
+    plot_observation_map(user_df, 'obs_map.html')
 
 
 if __name__ == '__main__':

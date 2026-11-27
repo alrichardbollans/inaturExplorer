@@ -16,6 +16,8 @@ rate_limit = 60  # Max number of requests per minute
 app_configs = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "app_configs.json")))
 cache_dir = app_configs["cache_dir"]
 
+LICENSES = ['CC-BY', 'CC-BY-SA', 'CC0']
+
 
 def generic_throttling():
     # Access the global variables
@@ -47,13 +49,7 @@ def find_taxon(name: str):
     return response["results"][0]
 
 
-def get_user_data(username: str):
-    generic_throttling()
-
-    observations = get_observations(user_id=username, page='all')
-
-    user_obs = Observation.from_json_list(observations)
-
+def get_df_from_obs(obs):
     df_list = [{'id': o.taxon.id, 'name': o.taxon.name, 'rank': o.taxon.rank, 'kingdom': o.taxon.kingdom.name if o.taxon.kingdom else None,
                 'phylum': o.taxon.phylum.name if o.taxon.phylum else None,
                 'total_obs_count': o.taxon.observations_count,
@@ -63,11 +59,21 @@ def get_user_data(username: str):
                 'date': o.observed_on.isoformat() if o.observed_on else None, 'uri': o.uri,
                 'first_photo': [o.photos[0].medium_url, o.photos[0].attribution, o.photos[0].license_code] if o.photos else None,
                 'username': o.username}
-               for o in user_obs if o.taxon]
+               for o in obs if o.taxon]
 
     df = pd.DataFrame(df_list)
 
     return df
+
+
+def get_user_data(username: str):
+    generic_throttling()
+
+    observations = get_observations(user_id=username, page='all')
+
+    user_obs = Observation.from_json_list(observations)
+
+    return get_df_from_obs(user_obs)
 
 
 def get_rarest_observation(user_data, include_captive: bool = False, rank='species'):
@@ -75,6 +81,7 @@ def get_rarest_observation(user_data, include_captive: bool = False, rank='speci
     if not include_captive:
         data = data[~data['captive']]
     return data.sort_values('total_obs_count', ascending=True).iloc[0]
+
 
 def get_favourite_taxa(user_data, include_captive: bool = True, rank='species'):
     species = user_data[user_data["rank"] == rank]
@@ -92,6 +99,7 @@ def get_favourite_taxa(user_data, include_captive: bool = True, rank='species'):
     with_photo = top_obs[top_obs["first_photo"].notna()]
     obs = (with_photo if not with_photo.empty else top_obs).iloc[0]
     return counts, obs
+
 
 def main():
     os.makedirs(cache_dir, exist_ok=True)

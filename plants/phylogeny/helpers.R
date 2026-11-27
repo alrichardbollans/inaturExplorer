@@ -63,7 +63,7 @@ get_highlight_nodes_for_tips <- function(tips_to_highlight, mrca_node, tree_data
 }
 
 get_plots_for_tips <- function(labelled_tree, tips_to_highlight, highlight_colour=col_hl, extra_tips=NULL, extra_highlight_colour=NULL){
-  line_size=0.02
+  line_size=0.005
   label_size = 24
   # root <- length(labelled_tree$tip.label) + 1L
   # stopifnot(!(root %in% labelled_tree$edge[, 2]))   # sanity check: the root is never a child
@@ -102,13 +102,11 @@ get_plots_for_tips <- function(labelled_tree, tips_to_highlight, highlight_colou
       "bg"    = col_bg
     )) +
     scale_linewidth_manual(values = c(
-      "main"  = 10 * line_size,
-      "extra" = 20 * line_size,
+      "main"  = 20 * line_size,
+      "extra" = 40 * line_size,
       "bg"    = 3 * line_size
     )) +
     theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))
-  
-  plot(circ1)
   
   
   return(circ1)

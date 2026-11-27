@@ -6,14 +6,16 @@ import importlib.util
 import os
 import re
 import shutil
+from urllib.parse import urlencode
 
 import pandas as pd
 import plotly.graph_objects as go
 import requests
 from PIL import Image
-from shiny import App, reactive, render, ui
+from shiny import App, reactive, render, req, ui
 
 from getting_inat_data.plot_observations import MAP_CLICK_JS, MAP_CONFIG, plot_observation_map
+from getting_inat_data.find_species_examples import get_multiple_examples
 from getting_inat_data import app_configs, cache_dir, get_rarest_observation, get_user_data, resolve_names, get_favourite_taxa
 
 REPO_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +27,8 @@ USER_FILE = app_configs["userfilename"]
 ACC_FILE = app_configs["accplantsfilename"]
 PHYDIV_FILE = app_configs["phydivfilename"]
 PHYPLOT_FILE = app_configs["phyplotfilename"]
+MAXDIV_FILE = app_configs["maxdivresultsfilename"]
+MAXDIV_PLOT_FILE = app_configs["maxdivphyplotfilename"]
 CHEMDIV_FILE = "phytochem_diversity.csv"
 CHEMCOMPOUNDS_FILE = "phytochem_compounds.csv"
 
@@ -93,8 +97,8 @@ def load_or_import_user(username: str, refresh: bool) -> dict:
             raise ValueError(f"No observations found for '{username}'.")
         user_df.to_csv(user_path)
         # Diversity results depend on the accepted names, so they are now stale.
-        for f in (PHYDIV_FILE, PHYPLOT_FILE, PHYPLOT_FILE.replace(".png", "_display.png"),
-                  CHEMDIV_FILE, CHEMCOMPOUNDS_FILE):
+        for f in (PHYDIV_FILE, PHYPLOT_FILE,
+                  MAXDIV_FILE, MAXDIV_PLOT_FILE, CHEMDIV_FILE, CHEMCOMPOUNDS_FILE):
             if os.path.exists(os.path.join(udir, f)):
                 os.remove(os.path.join(udir, f))
 
@@ -231,6 +235,56 @@ def spinner(message: str):
 
 
 app_ui = ui.page_fluid(
+    ui.tags.head(
+        ui.tags.style("""
+            .results-book > .nav {
+                gap: .5rem;
+                margin-bottom: 1rem;
+            }
+            .results-book > .nav > .nav-item:last-child {
+                margin-inline-start: auto;
+            }
+            .results-book > .nav .nav-link[data-value="plants"] {
+                color: var(--bs-success-text-emphasis);
+                background: var(--bs-success-bg-subtle);
+            }
+            .results-book > .nav .nav-link[data-value="plants"]:is(:hover, .active) {
+                color: white;
+                background: var(--bs-success);
+            }
+            .results-book > .tab-content, .maximiser-browser {
+                perspective: 1400px;
+            }
+            @media (prefers-reduced-motion: no-preference) {
+                .results-book > .tab-content > .tab-pane.active {
+                    animation: turn-results-page 450ms ease-out;
+                }
+                .results-book > .tab-content > [data-value="plants"] {
+                    --page-start-angle: 45deg;
+                    transform-origin: left center;
+                }
+                .results-book > .tab-content > [data-value="observations"] {
+                    --page-start-angle: -45deg;
+                    transform-origin: right center;
+                }
+                .maximiser-page {
+                    --page-start-angle: 45deg;
+                    transform-origin: left center;
+                    animation: turn-results-page 450ms ease-out;
+                }
+            }
+            @keyframes turn-results-page {
+                from {
+                    opacity: .45;
+                    transform: rotateY(var(--page-start-angle));
+                }
+                to {
+                    opacity: 1;
+                    transform: rotateY(0deg);
+                }
+            }
+        """),
+    ),
     ui.div(
         ui.h1("inaturDex", class_="display-4"),
         ui.p("Explore your iNaturalist observations.", class_="lead text-muted"),
@@ -316,43 +370,57 @@ def server(input, output, session):
                 f"(last updated {data['updated']:%Y-%m-%d %H:%M}).",
                 class_="text-muted text-center",
             ),
-            ui.layout_columns(
-                ui.card(
-                    ui.card_header(ui.h4("Rarest observed species", class_="m-0")),
-                    ui.output_ui("rarest_section"),
-                ),
-                ui.card(
-                    ui.card_header(ui.h4("Most observed species", class_="m-0")),
-                    ui.output_ui("most_observed_section"),
-                ),
-                col_widths=(6, 6),
-            ),
-            ui.card(
-                ui.card_header(ui.h4("Where you've observed", class_="m-0")),
-                ui.output_ui("observation_map"),
-                ui.p("Click a point to open the observation on iNaturalist.", class_="small text-muted m-0"),
-            ),
-            ui.card(
-                ui.card_header(ui.h4("Vascular plant diversity", class_="m-0")),
-                ui.div(
-                    ui.input_task_button(
-                        "analyse_btn", "Analyse Plant Diversity",
-                        label_busy="Analysing...", class_="btn-success",
+            ui.div(
+                ui.navset_pill(
+                    ui.nav_panel(
+                        "Observations",
+                        ui.layout_columns(
+                            ui.card(
+                                ui.card_header(ui.h4("Rarest observed species", class_="m-0")),
+                                ui.output_ui("rarest_section"),
+                            ),
+                            ui.card(
+                                ui.card_header(ui.h4("Most observed species", class_="m-0")),
+                                ui.output_ui("most_observed_section"),
+                            ),
+                            col_widths=(6, 6),
+                        ),
+                        ui.card(
+                            ui.card_header(ui.h4("Where you've observed", class_="m-0")),
+                            ui.output_ui("observation_map"),
+                            ui.p("Click a point to open the observation on iNaturalist.", class_="small text-muted m-0"),
+                        ),
+                        value="observations",
                     ),
-                    class_="text-center",
-                ),
-                ui.output_ui("diversity_section"),
-            ),
-            ui.card(
-                ui.card_header(ui.h4("Known phytochemical diversity", class_="m-0")),
-                ui.div(
-                    ui.input_task_button(
-                        "analyse_chem_btn", "Analyse Phytochemical Diversity",
-                        label_busy="Analysing...", class_="btn-success",
+                    ui.nav_panel(
+                        ui.span("Let’s explore plant diversity! ", ui.span("→", aria_hidden="true")),
+                        ui.card(
+                            ui.card_header(ui.h4("Vascular plant diversity", class_="m-0")),
+                            ui.div(
+                                ui.input_task_button(
+                                    "analyse_btn", "Analyse Plant Diversity",
+                                    label_busy="Analysing...", class_="btn-success",
+                                ),
+                                class_="text-center",
+                            ),
+                            ui.output_ui("diversity_section"),
+                        ),
+                        ui.card(
+                            ui.card_header(ui.h4("Known phytochemical diversity", class_="m-0")),
+                            ui.div(
+                                ui.input_task_button(
+                                    "analyse_chem_btn", "Analyse Phytochemical Diversity",
+                                    label_busy="Analysing...", class_="btn-success",
+                                ),
+                                class_="text-center",
+                            ),
+                            ui.output_ui("phytochem_section"),
+                        ),
+                        value="plants",
                     ),
-                    class_="text-center",
+                    selected="observations",
                 ),
-                ui.output_ui("phytochem_section"),
+                class_="results-book",
             ),
         )
 
@@ -367,17 +435,23 @@ def server(input, output, session):
                 path = download_photo(photo[0], imported()["dir"])
                 # licence = f" ({photo[2]})" if photo[2] else ""
                 image = ui.div(
-                    ui.img(src=image_data_uri(path), style="height: 400px; border-radius: 0.5rem;"),
+                    ui.img(src=image_data_uri(path), class_="img-fluid rounded", style="max-height: 400px;"),
                     ui.p(f"{photo[1]}", class_="small text-muted mt-1"),
                 )
             except requests.RequestException:
                 pass
-        return ui.TagList(
-            image,
-            ui.h3(ui.em(obs["name"]), class_="mt-2"),
+        return species_profile(
+            obs["name"], obs["uri"], image,
             ui.p(f"Kingdom: {obs['kingdom'] or '—'} · Phylum: {obs['phylum'] or '—'}"),
             *stats,
-            ui.a("View on iNaturalist", href=obs["uri"], target="_blank", class_="btn btn-outline-success btn-sm"),
+        )
+
+    def species_profile(name, url, image, *stats):
+        return ui.TagList(
+            image,
+            ui.h3(ui.em(name), class_="mt-2"),
+            *stats,
+            ui.a("View on iNaturalist", href=url, target="_blank", class_="btn btn-outline-success btn-sm"),
         )
 
     @render.ui
@@ -421,23 +495,38 @@ def server(input, output, session):
 
     # ---- Plant diversity --------------------------------------------------------------
 
+    maximiser_index = reactive.value(0)
+
     @ui.bind_task_button(button_id="analyse_btn")
     @reactive.extended_task
     async def div_task(udir: str):
         acc_df = get_resolved_names(udir)
         div_path, plot_path = os.path.join(udir, PHYDIV_FILE), os.path.join(udir, PHYPLOT_FILE)
+        maxdiv_path = os.path.join(udir, MAXDIV_FILE)
+        maxdiv_plot_path = os.path.join(udir, MAXDIV_PLOT_FILE)
         jobs = []
-        if not os.path.exists(div_path):
+        if not all(os.path.exists(path) for path in (div_path, maxdiv_path, maxdiv_plot_path)):
             jobs.append(run_r_script("get_div.R", udir))
         if not os.path.exists(plot_path):
             jobs.append(run_r_script("plot_tree.R", udir))
         await asyncio.gather(*jobs)  # both scripts run concurrently
         measures = pd.read_csv(div_path, index_col=0)["diversity_measures"]
-        return {"dir": udir, "measures": measures, "plot": plot_path, "acc_df": acc_df}
+        maximisers = pd.read_csv(maxdiv_path, index_col=0)
+        species_names = maximisers["tip"].str.replace("_", " ").unique().tolist()
+        try:
+            maximiser_examples = await asyncio.to_thread(get_multiple_examples, species_names)
+        except requests.RequestException:
+            maximiser_examples = pd.DataFrame()
+        return {
+            "dir": udir, "measures": measures, "plot": plot_path, "acc_df": acc_df,
+            "maximisers": maximisers, "maximiser_examples": maximiser_examples,
+            "maxdiv_plot": maxdiv_plot_path,
+        }
 
     @reactive.effect
     @reactive.event(input.analyse_btn)
     def _start_analysis():
+        maximiser_index.set(0)
         div_task(imported()["dir"])
 
     @render.ui
@@ -459,6 +548,7 @@ def server(input, output, session):
 
         m = div_task.result()["measures"]
         acc_df = div_task.result()["acc_df"]
+        count = len(div_task.result()["maximisers"])
         return ui.TagList(
             ui.layout_columns(
                 ui.value_box("Faith's phylogenetic diversity", f"{m['user_div']:,.0f}",
@@ -486,11 +576,69 @@ def server(input, output, session):
                 ),
                 col_widths=(7, 5),
             ),
+            ui.h5("Which species will most increase your observed diversity?", class_="mt-4"),
+            ui.layout_columns(
+                ui.div(
+                    ui.output_image("maxdiv_plot", height="auto"),
+                    ui.p("Blue marks the diversity maximisers on the tree.", class_="small text-muted"),
+                ),
+                ui.card(
+                    ui.output_ui("maximiser_species"),
+                    ui.card_footer(
+                        ui.input_action_button("next_maximiser", "Next species →", class_="btn-success"),
+                        class_="text-end",
+                    ) if count > 1 else None,
+                    class_="maximiser-browser",
+                ),
+                col_widths=(7, 5),
+            ) if count else ui.p("There are no additional species to add from this tree."),
         )
 
     @render.image(delete_file=False)
     def tree_plot():
         return {"src": div_task.result()["plot"], "style": "width: 100%; height: auto;"}
+
+    @render.image(delete_file=False)
+    def maxdiv_plot():
+        return {
+            "src": div_task.result()["maxdiv_plot"],
+            "alt": "Vascular plant tree with observed lineages in red and diversity maximisers in blue",
+            "style": "width: 100%; height: auto;",
+        }
+
+    @reactive.effect
+    @reactive.event(input.next_maximiser)
+    def _next_maximiser():
+        count = len(div_task.result()["maximisers"])
+        if count > 1:
+            maximiser_index.set((maximiser_index() + 1) % count)
+
+    @render.ui
+    def maximiser_species():
+        result = div_task.result()
+        maximisers = result["maximisers"]
+        req(not maximisers.empty)
+        index = maximiser_index()
+        row = maximisers.iloc[index]
+        name = row["tip"].replace("_", " ")
+        examples = result["maximiser_examples"]
+        matches = examples.loc[examples["name"] == name] if not examples.empty else examples
+        obs = matches.iloc[0] if not matches.empty else {
+            "name": name,
+            "first_photo": None,
+            "kingdom": "Plantae",
+            "phylum": None,
+            "uri": "https://www.inaturalist.org/observations?" + urlencode({"taxon_name": name}),
+        }
+        return ui.div(
+            species_highlight(
+                obs,
+                ui.p(ui.strong(f"+{row['gain']:,.2f}"), " branch length if you add this species"),
+                ui.p(f"Species {index + 1} of {len(maximisers)}", class_="small text-muted")
+                if len(maximisers) > 1 else None,
+            ),
+            class_="maximiser-page",
+        )
 
     @render.data_frame
     def species_table():
